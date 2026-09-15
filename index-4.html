@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>fx-calc</title>
+<meta name="theme-color" content="#1A1B1F">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root{
+    --bg:#1A1B1F;
+    --body-panel:#2B2D33;
+    --display-bg:#C4CFA1;
+    --display-ink:#1F2A1F;
+    --key-num:#3A3C43;
+    --key-num-text:#EDEBE6;
+    --key-fn:#33414D;
+    --key-fn-text:#B9CBD6;
+    --key-op:#E8672C;
+    --key-op-text:#1A1B1F;
+    --key-eq:#3E86D6;
+    --key-eq-text:#0E1620;
+    --radius:14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; height:100%;
+    background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    overscroll-behavior:none;
+  }
+  .shell{
+    width:100%; max-width:420px;
+    padding:18px 14px calc(18px + env(safe-area-inset-bottom));
+  }
+  .brand{
+    color:#5C5F68; font-size:12px; letter-spacing:0.08em;
+    margin:2px 4px 10px; display:flex; justify-content:space-between;
+  }
+  .brand span:last-child{color:#8A8E99;}
+  .calc{
+    background:var(--body-panel);
+    border-radius:22px;
+    padding:16px;
+    box-shadow:0 20px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .display{
+    background:var(--display-bg);
+    border-radius:var(--radius);
+    padding:22px 18px 16px;
+    margin-bottom:14px;
+    min-height:104px;
+    display:flex; flex-direction:column; justify-content:flex-end;
+    box-shadow:inset 0 2px 6px rgba(0,0,0,0.25);
+  }
+  .history{
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    color:var(--display-ink);
+    opacity:0.55;
+    font-size:14px;
+    min-height:18px;
+    text-align:right;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .current{
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    color:var(--display-ink);
+    font-size:38px;
+    font-weight:600;
+    text-align:right;
+    white-space:nowrap;
+    overflow:hidden;
+    letter-spacing:0.01em;
+  }
+  .mode-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:"SFMono-Regular",Consolas,monospace;
+    font-size:11px; color:var(--display-ink); opacity:0.6;
+    margin-top:6px;
+  }
+  .mode-row button{
+    background:none; border:1px solid rgba(31,42,31,0.3);
+    color:var(--display-ink); font-size:11px;
+    border-radius:6px; padding:3px 8px;
+    font-family:inherit; opacity:0.8;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(5, 1fr);
+    gap:8px;
+  }
+  .key{
+    appearance:none; border:none; cursor:pointer;
+    border-radius:11px;
+    padding:14px 0;
+    font-size:16px;
+    font-weight:500;
+    background:var(--key-num);
+    color:var(--key-num-text);
+    transition:transform 0.06s ease, filter 0.06s ease;
+  }
+  .key:active{ transform:scale(0.94); filter:brightness(1.15); }
+  .key.fn{ background:var(--key-fn); color:var(--key-fn-text); font-size:13.5px; }
+  .key.op{ background:var(--key-op); color:var(--key-op-text); font-weight:700; }
+  .key.eq{ background:var(--key-eq); color:var(--key-eq-text); font-weight:700; }
+  .key.wide{ grid-column:span 2; }
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:#33414D; color:#EDEBE6; padding:8px 16px; border-radius:20px;
+    font-size:13px; opacity:0; transition:opacity 0.2s ease; pointer-events:none;
+  }
+  .toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="brand"><span>fx&#8209;calc</span><span id="angleMode">DEG</span></div>
+
+  <div class="calc">
+    <div class="display">
+      <div class="history" id="history">&nbsp;</div>
+      <div class="current" id="current">0</div>
+      <div class="mode-row">
+        <button id="modeBtn">DEG/RAD</button>
+        <span id="errFlag"></span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <button class="key fn" data-act="sin">sin</button>
+      <button class="key fn" data-act="cos">cos</button>
+      <button class="key fn" data-act="tan">tan</button>
+      <button class="key fn" data-act="log">log</button>
+      <button class="key fn" data-act="ln">ln</button>
+
+      <button class="key fn" data-act="sqrt">&#8730;</button>
+      <button class="key fn" data-act="pow">x^y</button>
+      <button class="key" data-num="(">(</button>
+      <button class="key" data-num=")">)</button>
+      <button class="key fn" data-act="clear">C</button>
+
+      <button class="key" data-num="7">7</button>
+      <button class="key" data-num="8">8</button>
+      <button class="key" data-num="9">9</button>
+      <button class="key fn" data-act="back">&#9003;</button>
+      <button class="key op" data-op="/">&divide;</button>
+
+      <button class="key" data-num="4">4</button>
+      <button class="key" data-num="5">5</button>
+      <button class="key" data-num="6">6</button>
+      <button class="key op" data-op="*">&times;</button>
+      <button class="key op" data-op="-">&minus;</button>
+
+      <button class="key" data-num="1">1</button>
+      <button class="key" data-num="2">2</button>
+      <button class="key" data-num="3">3</button>
+      <button class="key" data-num="0">0</button>
+      <button class="key op" data-op="+">+</button>
+
+      <button class="key" data-num=".">.</button>
+      <button class="key eq wide" data-act="equals">=</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let expr = "";
+let lastResult = null;
+let degMode = true;
+
+const currentEl = document.getElementById("current");
+const historyEl = document.getElementById("history");
+const angleModeEl = document.getElementById("angleMode");
+const toastEl = document.getElementById("toast");
+
+function render(){
+  currentEl.textContent = expr === "" ? "0" : expr;
+}
+
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=> toastEl.classList.remove("show"), 1600);
+}
+
+function toRad(x){ return degMode ? x * Math.PI / 180 : x; }
+
+// Safe function-call layer, mirrors the Python version's separate functions
+const fx = {
+  sin: x => Math.sin(toRad(x)),
+  cos: x => Math.cos(toRad(x)),
+  tan: x => Math.tan(toRad(x)),
+  log: x => { if (x <= 0) throw new Error("log domain"); return Math.log10(x); },
+  ln:  x => { if (x <= 0) throw new Error("ln domain"); return Math.log(x); },
+  sqrt: x => { if (x < 0) throw new Error("sqrt domain"); return Math.sqrt(x); },
+};
+
+document.querySelectorAll("[data-num]").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    expr += btn.dataset.num;
+    render();
+  });
+});
+
+document.querySelectorAll("[data-op]").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    if (expr === "" && lastResult !== null) expr = String(lastResult);
+    expr += btn.dataset.op;
+    render();
+  });
+});
+
+document.getElementById("modeBtn").addEventListener("click", ()=>{
+  degMode = !degMode;
+  angleModeEl.textContent = degMode ? "DEG" : "RAD";
+  toast(degMode ? "Degrees mode" : "Radians mode");
+});
+
+document.querySelectorAll("[data-act]").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    const act = btn.dataset.act;
+    if (act === "clear"){ expr=""; historyEl.textContent="\u00a0"; render(); return; }
+    if (act === "back"){ expr = expr.slice(0,-1); render(); return; }
+    if (act === "pow"){ expr += "**"; render(); return; }
+    if (["sin","cos","tan","log","ln","sqrt"].includes(act)){
+      expr += act + "(";
+      render();
+      return;
+    }
+    if (act === "equals"){ evaluate(); return; }
+  });
+});
+
+function evaluate(){
+  if (expr.trim() === ""){ return; }
+  const safeExpr = expr.replace(/\*\*/g, "^");
+  try{
+    const jsExpr = expr
+      .replace(/\^/g, "**")
+      .replace(/sin\(/g, "fx.sin(")
+      .replace(/cos\(/g, "fx.cos(")
+      .replace(/tan\(/g, "fx.tan(")
+      .replace(/log\(/g, "fx.log(")
+      .replace(/ln\(/g, "fx.ln(")
+      .replace(/sqrt\(/g, "fx.sqrt(");
+
+    // eslint-disable-next-line no-new-func
+    const result = Function("fx", `"use strict"; return (${jsExpr});`)(fx);
+
+    if (typeof result !== "number" || !isFinite(result)){
+      throw new Error("bad result");
+    }
+
+    historyEl.textContent = safeExpr + " =";
+    lastResult = Math.round(result * 1e10) / 1e10;
+    expr = String(lastResult);
+    render();
+  } catch(e){
+    toast("Can't evaluate that");
+  }
+}
+
+// Keyboard support for anyone testing on desktop before hosting
+window.addEventListener("keydown", (e)=>{
+  if (/[0-9.()+\-*/]/.test(e.key)){ expr += e.key; render(); }
+  else if (e.key === "Enter"){ evaluate(); }
+  else if (e.key === "Backspace"){ expr = expr.slice(0,-1); render(); }
+  else if (e.key === "Escape"){ expr=""; render(); }
+});
+
+render();
+
+if ("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
